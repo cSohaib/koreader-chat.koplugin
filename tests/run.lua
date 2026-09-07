@@ -93,7 +93,9 @@ lfs.rmdir(temporary)
 -- Stub the bundled JSON codec, not the Responses output parser. Production
 -- uses KOReader's rapidjson; these tests need only Lua and LuaFileSystem.
 local fixture, encoded
+local json_null = io.stdout -- truthy userdata, like rapidjson.null (not Lua nil)
 package.preload.rapidjson = function() return {
+    null = json_null,
     encode = function(value) encoded = value; return "request-json" end,
     decode = function(value) if value == "invalid" then error("invalid JSON") end; return fixture end,
 } end
@@ -116,6 +118,20 @@ test("Extracts all assistant text blocks and ignores reasoning", function()
         } },
     } }
     equal(Api.parse("valid", 200), "One\n\nTwo")
+end)
+
+test("Successful response with JSON null error is not an API failure", function()
+    fixture = { status = "completed", error = json_null, output = {{
+        type = "message", role = "assistant",
+        content = {{ type = "output_text", text = "Successful answer" }},
+    }} }
+    equal(Api.parse("valid", 200), "Successful answer")
+    fixture.status = json_null
+    equal(Api.parse("valid", 200), "Successful answer")
+    assert(not Api.parse("valid", 500))
+    fixture.error = { message = "Real API error" }
+    local answer, err = Api.parse("valid", 200)
+    assert(not answer and err:find("Real API error", 1, true))
 end)
 
 test("Handles refusals, API errors, empty, incomplete and invalid responses", function()
