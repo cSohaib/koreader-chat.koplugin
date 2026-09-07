@@ -1,0 +1,3 @@
+*.tmp
+chat-history/
+koreader_chat.lua
