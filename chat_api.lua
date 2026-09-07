@@ -32,11 +32,13 @@ function Api.parse(body, status)
     if not ok or type(data) ~= "table" then
         return nil, "HTTP " .. tostring(status) .. ": endpoint did not return valid JSON."
     end
-    if tonumber(status) ~= 200 or data.error then
+    -- RapidJSON's null sentinel is truthy; successful Responses use error: null.
+    if tonumber(status) ~= 200 or (data.error and data.error ~= json.null) then
         local message = type(data.error) == "table" and data.error.message
-        return nil, "HTTP " .. tostring(status) .. ": " .. tostring(message or "request failed")
+        return nil, "HTTP " .. tostring(status) .. ": "
+            .. (type(message) == "string" and message or "request failed")
     end
-    if data.status and data.status ~= "completed" then
+    if data.status and data.status ~= json.null and data.status ~= "completed" then
         return nil, "Response " .. tostring(data.status) .. ". Retry the saved message."
     end
     local parts = {}
